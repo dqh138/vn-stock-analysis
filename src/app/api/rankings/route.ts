@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(parseInt(params.get("limit") ?? "50") || 50, 200);
 
   // Resolve target year
-  let targetYear = year;
+  let targetYear: number = year ?? 0;
   if (!targetYear) {
     const { data: yearData } = await supabase
       .from("financial_ratios").select("year").is("quarter", null).order("year", { ascending: false }).limit(1).single();
