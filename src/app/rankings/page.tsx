@@ -15,6 +15,11 @@ interface RankingRow {
   roe: number | null;
   eps_vnd: number | null;
   net_profit_margin: number | null;
+  eps_cagr_5y: number | null;
+  valuation_score: number | null;
+  growth_score: number | null;
+  valuation_band: string | null;
+  growth_band: string | null;
   score: number;
 }
 
@@ -122,8 +127,10 @@ function RankingsTable() {
                   <th className="px-4 py-3 text-right">P/E</th>
                   <th className="px-4 py-3 text-right">P/B</th>
                   <th className="px-4 py-3 text-right">ROE</th>
-                  <th className="px-4 py-3 text-right">Biên lợi nhuận</th>
-                  <th className="px-4 py-3 text-right">EPS (VND)</th>
+                  <th className="px-4 py-3 text-right">Biên LN</th>
+                  <th className="px-4 py-3 text-right">EPS CAGR 5Y</th>
+                  <th className="px-4 py-3 text-right">Đ.Giá trị</th>
+                  <th className="px-4 py-3 text-right">Đ.Tăng trưởng</th>
                 </tr>
               </thead>
               <tbody>
@@ -149,7 +156,27 @@ function RankingsTable() {
                     <td className="px-4 py-3 text-right text-emerald-300">{pct(row.roe)}</td>
                     <td className="px-4 py-3 text-right text-slate-200">{pct(row.net_profit_margin)}</td>
                     <td className="px-4 py-3 text-right text-slate-200">
-                      {row.eps_vnd !== null ? Math.round(row.eps_vnd).toLocaleString("vi-VN") : "—"}
+                      {row.eps_cagr_5y !== null ? `${row.eps_cagr_5y > 0 ? "+" : ""}${row.eps_cagr_5y.toFixed(1)}%` : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                        row.valuation_band === "cheap" ? "bg-emerald-500/20 text-emerald-300" :
+                        row.valuation_band === "expensive" ? "bg-red-500/20 text-red-300" :
+                        "bg-slate-700 text-slate-300"
+                      }`}>
+                        {row.valuation_band === "cheap" ? "Rẻ" : row.valuation_band === "expensive" ? "Đắt" : row.valuation_band === "fair" ? "Hợp lý" : "—"}
+                        {row.valuation_score !== null ? ` ${Math.round(row.valuation_score)}` : ""}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                        row.growth_band === "high" ? "bg-sky-500/20 text-sky-300" :
+                        row.growth_band === "low" ? "bg-slate-700 text-slate-400" :
+                        "bg-slate-700 text-slate-300"
+                      }`}>
+                        {row.growth_band === "high" ? "Cao" : row.growth_band === "medium" ? "TB" : row.growth_band === "low" ? "Thấp" : "—"}
+                        {row.growth_score !== null ? ` ${Math.round(row.growth_score)}` : ""}
+                      </span>
                     </td>
                   </tr>
                 ))}

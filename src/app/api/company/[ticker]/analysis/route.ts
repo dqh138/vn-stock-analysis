@@ -3,6 +3,8 @@ import { supabase } from "@/lib/supabase";
 import { calculatePiotroski } from "@/lib/analysis/piotroski";
 import { calculateHealthScore } from "@/lib/analysis/health";
 import { calculateCAGR } from "@/lib/analysis/cagr";
+import { calculateAltman } from "@/lib/analysis/altman";
+import { calculateEarlyWarning } from "@/lib/analysis/early_warning";
 import type { FinancialRatios, BalanceSheet, CashFlow, IncomeStatement } from "@/lib/types";
 
 export async function GET(
@@ -12,36 +14,11 @@ export async function GET(
   const { ticker } = await params;
   const symbol = ticker.toUpperCase();
 
-  // Fetch last 6 years of annual data in parallel
   const [ratiosRes, balanceRes, cashflowRes, incomeRes] = await Promise.all([
-    supabase
-      .from("financial_ratios")
-      .select("*")
-      .eq("symbol", symbol)
-      .is("quarter", null)
-      .order("year", { ascending: false })
-      .limit(6),
-    supabase
-      .from("balance_sheet")
-      .select("*")
-      .eq("symbol", symbol)
-      .is("quarter", null)
-      .order("year", { ascending: false })
-      .limit(6),
-    supabase
-      .from("cash_flow_statement")
-      .select("*")
-      .eq("symbol", symbol)
-      .is("quarter", null)
-      .order("year", { ascending: false })
-      .limit(2),
-    supabase
-      .from("income_statement")
-      .select("symbol,year,quarter,revenue,net_profit,net_profit_parent_company,eps")
-      .eq("symbol", symbol)
-      .is("quarter", null)
-      .order("year", { ascending: true })
-      .limit(10),
+    supabase.from("financial_ratios").select("*").eq("symbol", symbol).is("quarter", null).order("year", { ascending: false }).limit(6),
+    supabase.from("balance_sheet").select("*").eq("symbol", symbol).is("quarter", null).order("year", { ascending: false }).limit(6),
+    supabase.from("cash_flow_statement").select("*").eq("symbol", symbol).is("quarter", null).order("year", { ascending: false }).limit(4),
+    supabase.from("income_statement").select("symbol,year,quarter,revenue,net_revenue,net_profit,net_profit_parent_company,eps,operating_profit,profit_before_tax").eq("symbol", symbol).is("quarter", null).order("year", { ascending: true }).limit(10),
   ]);
 
   const ratios = (ratiosRes.data ?? []) as FinancialRatios[];
@@ -52,20 +29,39 @@ export async function GET(
   const curr = ratios[0];
   const prev = ratios[1];
 
+  // Piotroski F-Score (needs curr + prev year ratios, balances, latest cashflow + income)
   let piotroski = null;
-  if (curr && prev && cashflows[0] && balances[0] && balances[1]) {
-    piotroski = calculatePiotroski(curr, prev, cashflows[0], balances[0], balances[1]);
+  if (curr && prev && balances[0] && balances[1] && cashflows[0] && incomes.length > 0) {
+    const latestIncome = [...incomes].sort((a, b) => (b.year ?? 0) - (a.year ?? 0))[0];
+    piotroski = calculatePiotroski(curr, prev, balances[0], balances[1], cashflows[0], latestIncome);
   }
 
+  // Altman Z-Score
+  let altman = null;
+  if (balances[0] && incomes.length > 0) {
+    const latestIncome = [...incomes].sort((a, b) => (b.year ?? 0) - (a.year ?? 0))[0];
+    altman = calculateAltman(balances[0], latestIncome);
+  }
+
+  // Health Score
   const health = curr ? calculateHealthScore(curr) : null;
+
+  // CAGR (multi-year from income series)
   const cagr = incomes.length >= 2 ? calculateCAGR(incomes) : null;
+
+  // Early Warning
+  const early_warning = ratios.length >= 2
+    ? calculateEarlyWarning(ratios, cashflows, altman, piotroski)
+    : null;
 
   return NextResponse.json({
     symbol,
     latest_year: curr?.year ?? null,
     piotroski,
+    altman,
     health,
     cagr,
+    early_warning,
     latest_ratios: curr ?? null,
   });
 }

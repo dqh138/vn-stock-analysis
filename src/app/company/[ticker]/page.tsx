@@ -8,6 +8,8 @@ import type {
   Company, FinancialRatios, BalanceSheet,
   IncomeStatement, CashFlow, PiotroskiResult, HealthScore, CAGRResult,
 } from "@/lib/types";
+import type { AltmanResult } from "@/lib/analysis/altman";
+import type { EarlyWarningResult } from "@/lib/analysis/early_warning";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -58,15 +60,72 @@ function HealthCard({ health }: { health: HealthScore }) {
   );
 }
 
+function AltmanCard({ a }: { a: AltmanResult }) {
+  const color = a.zone === "safe" ? "text-emerald-400" : a.zone === "grey" ? "text-amber-400" : a.zone === "distress" ? "text-rose-400" : "text-slate-400";
+  const bg = a.zone === "safe" ? "border-emerald-500/30" : a.zone === "grey" ? "border-amber-500/30" : a.zone === "distress" ? "border-rose-500/30" : "border-white/10";
+  return (
+    <div className={`rounded-2xl border ${bg} bg-slate-900/70 p-5`}>
+      <p className="text-xs uppercase tracking-widest text-slate-400">Altman Z-Score</p>
+      <div className="mt-2 flex items-end gap-3">
+        <span className={`text-4xl font-bold ${color}`}>{a.z_score ?? "—"}</span>
+        <span className={`mb-1 text-sm font-medium ${color}`}>{a.vietnamese_rating}</span>
+      </div>
+      <p className="mt-2 text-xs text-slate-400">{a.interpretation}</p>
+      {a.z_score !== null && (
+        <div className="mt-3 grid grid-cols-2 gap-1 text-xs">
+          {Object.entries(a.components).map(([k, v]) => (
+            <div key={k} className="flex justify-between rounded bg-white/5 px-2 py-1">
+              <span className="text-slate-500">{k.replace(/_/g, " ").replace("x", "X")}</span>
+              <span className="text-slate-300">{v?.toFixed(3)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EarlyWarningCard({ ew }: { ew: EarlyWarningResult }) {
+  const levelColor = ew.risk_level === "low" ? "text-emerald-400" : ew.risk_level === "medium" ? "text-amber-400" : ew.risk_level === "high" ? "text-orange-400" : "text-rose-400";
+  const levelLabel: Record<string, string> = { low: "Thấp", medium: "Trung bình", high: "Cao", critical: "Nghiêm trọng" };
+  return (
+    <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-5">
+      <p className="text-xs uppercase tracking-widest text-slate-400">Cảnh báo sớm</p>
+      <div className="mt-2 flex items-end gap-3">
+        <span className={`text-4xl font-bold ${levelColor}`}>{ew.risk_score}</span>
+        <span className={`mb-1 text-sm font-medium ${levelColor}`}>{levelLabel[ew.risk_level]}</span>
+      </div>
+      {ew.alerts.length > 0 && (
+        <ul className="mt-3 space-y-1 text-xs">
+          {ew.alerts.map((a, i) => (
+            <li key={i} className="flex gap-1.5 text-rose-300">
+              <span>⚠</span><span>{a.message}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {ew.positive_signals.length > 0 && (
+        <ul className="mt-2 space-y-1 text-xs">
+          {ew.positive_signals.map((s, i) => (
+            <li key={i} className="flex gap-1.5 text-emerald-300">
+              <span>✓</span><span>{s}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function PiotroskiCard({ p }: { p: PiotroskiResult }) {
   const color = p.score >= 7 ? "text-emerald-400" : p.score >= 4 ? "text-amber-400" : "text-rose-400";
   const signals = [
     { label: "ROA dương", value: p.signals.roa_positive },
     { label: "Dòng tiền dương", value: p.signals.ocf_positive },
     { label: "ROA cải thiện", value: p.signals.roa_improving },
-    { label: "Accruals thấp", value: p.signals.low_accruals },
+    { label: "CFO ≥ 0.8×NI", value: p.signals.cfo_gt_net_income },
     { label: "Đòn bẩy cải thiện", value: p.signals.leverage_improving },
-    { label: "Thanh khoản tốt hơn", value: p.signals.liquidity_improving },
+    { label: "Thanh khoản tốt hơn", value: p.signals.current_ratio_improving },
     { label: "Không pha loãng", value: p.signals.no_dilution },
     { label: "Biên gộp cải thiện", value: p.signals.gross_margin_improving },
     { label: "Hiệu suất tài sản tốt", value: p.signals.asset_turnover_improving },
@@ -208,8 +267,10 @@ export default function CompanyPage() {
   const [analysis, setAnalysis] = useState<{
     latest_year: number | null;
     piotroski: PiotroskiResult | null;
+    altman: AltmanResult | null;
     health: HealthScore | null;
     cagr: CAGRResult | null;
+    early_warning: EarlyWarningResult | null;
     latest_ratios: FinancialRatios | null;
   } | null>(null);
   const [tab, setTab] = useState<Tab>("Tổng quan");
@@ -313,6 +374,8 @@ export default function CompanyPage() {
           {analysis?.health && <HealthCard health={analysis.health} />}
           {analysis?.piotroski && <PiotroskiCard p={analysis.piotroski} />}
           {analysis?.cagr && analysis.cagr.years > 0 && <CAGRCard c={analysis.cagr} />}
+          {analysis?.altman && <AltmanCard a={analysis.altman} />}
+          {analysis?.early_warning && <EarlyWarningCard ew={analysis.early_warning} />}
         </div>
 
         {/* Key metrics */}
