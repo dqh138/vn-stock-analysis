@@ -5,6 +5,8 @@ import { calculateHealthScore } from "@/lib/analysis/health";
 import { calculateCAGR } from "@/lib/analysis/cagr";
 import { calculateAltman } from "@/lib/analysis/altman";
 import { calculateEarlyWarning } from "@/lib/analysis/early_warning";
+import { calculateCashFlowQuality } from "@/lib/analysis/cashflow_quality";
+import { calculateWorkingCapital } from "@/lib/analysis/working_capital";
 import type { FinancialRatios, BalanceSheet, CashFlow, IncomeStatement } from "@/lib/types";
 
 export async function GET(
@@ -54,6 +56,21 @@ export async function GET(
     ? calculateEarlyWarning(ratios, cashflows, altman, piotroski)
     : null;
 
+  // Cash Flow Quality
+  const latestCashflow = cashflows[0] ?? null;
+  const prevCashflow = cashflows[1] ?? null;
+  const latestIncomeForCF = incomes.length > 0
+    ? [...incomes].sort((a, b) => (b.year ?? 0) - (a.year ?? 0))[0]
+    : null;
+  const cashflow_quality = latestCashflow && latestIncomeForCF
+    ? calculateCashFlowQuality(latestCashflow, latestIncomeForCF, prevCashflow)
+    : null;
+
+  // Working Capital Efficiency
+  const working_capital = balances[0] && latestIncomeForCF
+    ? calculateWorkingCapital(balances[0], latestIncomeForCF)
+    : null;
+
   return NextResponse.json({
     symbol,
     latest_year: curr?.year ?? null,
@@ -62,6 +79,8 @@ export async function GET(
     health,
     cagr,
     early_warning,
+    cashflow_quality,
+    working_capital,
     latest_ratios: curr ?? null,
   });
 }

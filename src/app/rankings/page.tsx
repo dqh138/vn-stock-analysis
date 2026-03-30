@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
 
 interface RankingRow {
   rank: number;
@@ -23,14 +22,27 @@ interface RankingRow {
   score: number;
 }
 
-function fmt(v: number | null, decimals = 1): string {
+function fmt(v: number | null, d = 1) {
   if (v === null || isNaN(v)) return "—";
-  return v.toFixed(decimals);
+  return v.toFixed(d);
 }
-
-function pct(v: number | null): string {
+function pct(v: number | null) {
   if (v === null || isNaN(v)) return "—";
   return `${(v * 100).toFixed(1)}%`;
+}
+
+function ValuationBand({ band, score }: { band: string | null; score: number | null }) {
+  if (!band || band === "unknown") return <span style={{ color: "var(--text-tertiary)" }}>—</span>;
+  const cls = band === "cheap" ? "band-cheap" : band === "expensive" ? "band-expensive" : "band-fair";
+  const label = band === "cheap" ? "Rẻ" : band === "expensive" ? "Đắt" : "Hợp lý";
+  return <span className={cls}>{label}{score !== null ? ` ${Math.round(score)}` : ""}</span>;
+}
+
+function GrowthBand({ band, score }: { band: string | null; score: number | null }) {
+  if (!band || band === "unknown") return <span style={{ color: "var(--text-tertiary)" }}>—</span>;
+  const cls = band === "high" ? "band-high" : band === "medium" ? "band-medium" : "band-low";
+  const label = band === "high" ? "Cao" : band === "medium" ? "TB" : "Thấp";
+  return <span className={cls}>{label}{score !== null ? ` ${Math.round(score)}` : ""}</span>;
 }
 
 function RankingsTable() {
@@ -45,9 +57,8 @@ function RankingsTable() {
 
   useEffect(() => {
     fetch("/api/industries")
-      .then((r) => r.json())
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .then((data: any[]) => setIndustries(data.map((d) => d.icb_name3)))
+      .then((r) => r.json()).then((data: any[]) => setIndustries(data.map((d) => d.icb_name3)))
       .catch(() => {});
   }, []);
 
@@ -56,160 +67,100 @@ function RankingsTable() {
     const params = new URLSearchParams({ sort_by: sortBy, limit: "100" });
     if (industry) params.set("industry", industry);
     if (exchange) params.set("exchange", exchange);
-
     fetch(`/api/rankings?${params}`)
       .then((r) => r.json())
-      .then((data) => {
-        setRows(data.rankings ?? []);
-        setYear(data.year ?? null);
-      })
+      .then((data) => { setRows(data.rankings ?? []); setYear(data.year ?? null); })
       .catch(() => {})
       .finally(() => setIsLoading(false));
   }, [sortBy, industry, exchange]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <header className="border-b border-white/10 bg-slate-950/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-6 py-5">
-          <div className="flex-1">
-            <a href="/" className="text-xs text-slate-400 hover:text-slate-200">← Trang chủ</a>
-            <h1 className="mt-1 text-2xl font-semibold">
-              Rankings {year ? <span className="text-slate-400 text-lg font-normal">{year}</span> : ""}
-            </h1>
+    <>
+      <div className="dashboard-hero" style={{ paddingBottom: "1.5rem" }}>
+        <div className="rankings-hero-row">
+          <div>
+            <h1 className="dashboard-hero-title" style={{ textAlign: "left" }}>🏆 Bảng xếp hạng cổ phiếu</h1>
+            <p className="dashboard-hero-subtitle" style={{ textAlign: "left", margin: 0 }}>
+              {year ? `Năm tài chính ${year} — ` : ""}{isLoading ? "Đang tải..." : `${rows.length} công ty`}
+            </p>
           </div>
-          <div className="flex flex-wrap gap-2 text-sm">
-            <FilterSelect
-              value={sortBy}
-              onChange={setSortBy}
-              options={[
-                { value: "overall", label: "Overall" },
-                { value: "valuation", label: "Valuation" },
-                { value: "growth", label: "Quality" },
-              ]}
-            />
-            <FilterSelect
-              value={exchange}
-              onChange={setExchange}
-              options={[
-                { value: "", label: "All exchanges" },
-                { value: "HOSE", label: "HOSE" },
-                { value: "HNX", label: "HNX" },
-                { value: "UPCOM", label: "UPCOM" },
-              ]}
-            />
-            <FilterSelect
-              value={industry}
-              onChange={setIndustry}
-              options={[
-                { value: "", label: "All industries" },
-                ...industries.map((i) => ({ value: i, label: i })),
-              ]}
-            />
+          <div className="rankings-controls">
+            <select className="select-input" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+              <option value="overall">Tổng hợp</option>
+              <option value="valuation">Định giá (rẻ → đắt)</option>
+              <option value="growth">Tăng trưởng (cao → thấp)</option>
+            </select>
+            <select className="select-input" value={exchange} onChange={(e) => setExchange(e.target.value)}>
+              <option value="">Tất cả sàn</option>
+              <option value="HOSE">HOSE</option>
+              <option value="HNX">HNX</option>
+              <option value="UPCOM">UPCOM</option>
+            </select>
+            <select className="select-input" value={industry} onChange={(e) => setIndustry(e.target.value)} style={{ maxWidth: 180 }}>
+              <option value="">Tất cả ngành</option>
+              {industries.map((i) => <option key={i} value={i}>{i}</option>)}
+            </select>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="mx-auto max-w-7xl px-6 py-8">
-        {isLoading ? (
-          <p className="text-slate-400 text-center py-16">Đang tải...</p>
-        ) : rows.length === 0 ? (
-          <p className="text-slate-400 text-center py-16">Không có dữ liệu.</p>
-        ) : (
-          <div className="overflow-x-auto rounded-2xl border border-white/10">
-            <table className="w-full text-sm">
+      <div className="card">
+        <div className="card-header">
+          <h3 className="card-title">Kết quả</h3>
+        </div>
+        <div className="rankings-table-wrap">
+          {isLoading ? (
+            <div style={{ textAlign: "center", padding: "3rem" }}>
+              <div className="loading-spinner" />
+              <p style={{ marginTop: "1rem", color: "var(--text-secondary)" }}>Đang tải...</p>
+            </div>
+          ) : rows.length === 0 ? (
+            <p style={{ textAlign: "center", padding: "3rem", color: "var(--text-secondary)" }}>Không có dữ liệu.</p>
+          ) : (
+            <table className="data-table">
               <thead>
-                <tr className="border-b border-white/10 text-xs uppercase tracking-wider text-slate-400">
-                  <th className="px-4 py-3 text-left">#</th>
-                  <th className="px-4 py-3 text-left">Mã</th>
-                  <th className="px-4 py-3 text-left">Công ty</th>
-                  <th className="px-4 py-3 text-left">Ngành</th>
-                  <th className="px-4 py-3 text-center">Sàn</th>
-                  <th className="px-4 py-3 text-right">P/E</th>
-                  <th className="px-4 py-3 text-right">P/B</th>
-                  <th className="px-4 py-3 text-right">ROE</th>
-                  <th className="px-4 py-3 text-right">Biên LN</th>
-                  <th className="px-4 py-3 text-right">EPS CAGR 5Y</th>
-                  <th className="px-4 py-3 text-right">Đ.Giá trị</th>
-                  <th className="px-4 py-3 text-right">Đ.Tăng trưởng</th>
+                <tr>
+                  <th>#</th>
+                  <th>Mã</th>
+                  <th>Doanh nghiệp</th>
+                  <th>Ngành</th>
+                  <th>Sàn</th>
+                  <th className="number">Điểm ĐG</th>
+                  <th>ĐG</th>
+                  <th className="number">P/E</th>
+                  <th className="number">P/B</th>
+                  <th className="number">Điểm TG</th>
+                  <th>TG</th>
+                  <th className="number">EPS CAGR 5y</th>
+                  <th className="number">ROE</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr
-                    key={row.ticker}
-                    className="border-b border-white/5 hover:bg-white/3 transition"
-                  >
-                    <td className="px-4 py-3 text-slate-500">{row.rank}</td>
-                    <td className="px-4 py-3">
-                      <a
-                        href={`/company/${row.ticker}`}
-                        className="font-mono font-semibold text-sky-300 hover:text-sky-200"
-                      >
-                        {row.ticker}
-                      </a>
-                    </td>
-                    <td className="px-4 py-3 max-w-48 truncate text-slate-200">{row.organ_name}</td>
-                    <td className="px-4 py-3 max-w-36 truncate text-slate-400 text-xs">{row.icb_name3 ?? "—"}</td>
-                    <td className="px-4 py-3 text-center text-xs text-slate-400">{row.exchange ?? "—"}</td>
-                    <td className="px-4 py-3 text-right text-slate-200">{fmt(row.pe)}</td>
-                    <td className="px-4 py-3 text-right text-slate-200">{fmt(row.pb)}</td>
-                    <td className="px-4 py-3 text-right text-emerald-300">{pct(row.roe)}</td>
-                    <td className="px-4 py-3 text-right text-slate-200">{pct(row.net_profit_margin)}</td>
-                    <td className="px-4 py-3 text-right text-slate-200">
+                  <tr key={row.ticker}>
+                    <td style={{ color: "var(--text-tertiary)" }}>{row.rank}</td>
+                    <td><a href={`/company/${row.ticker}`} className="ticker-link">{row.ticker}</a></td>
+                    <td style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.organ_name}</td>
+                    <td style={{ maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-secondary)", fontSize: "0.75rem" }}>{row.icb_name3 ?? "—"}</td>
+                    <td style={{ color: "var(--text-secondary)", fontSize: "0.75rem" }}>{row.exchange ?? "—"}</td>
+                    <td className="number">{fmt(row.valuation_score)}</td>
+                    <td><ValuationBand band={row.valuation_band} score={null} /></td>
+                    <td className="number">{fmt(row.pe)}</td>
+                    <td className="number">{fmt(row.pb, 2)}</td>
+                    <td className="number">{fmt(row.growth_score)}</td>
+                    <td><GrowthBand band={row.growth_band} score={null} /></td>
+                    <td className="number" style={{ color: row.eps_cagr_5y !== null && row.eps_cagr_5y > 0 ? "#86efac" : row.eps_cagr_5y !== null && row.eps_cagr_5y < 0 ? "#fca5a5" : undefined }}>
                       {row.eps_cagr_5y !== null ? `${row.eps_cagr_5y > 0 ? "+" : ""}${row.eps_cagr_5y.toFixed(1)}%` : "—"}
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                        row.valuation_band === "cheap" ? "bg-emerald-500/20 text-emerald-300" :
-                        row.valuation_band === "expensive" ? "bg-red-500/20 text-red-300" :
-                        "bg-slate-700 text-slate-300"
-                      }`}>
-                        {row.valuation_band === "cheap" ? "Rẻ" : row.valuation_band === "expensive" ? "Đắt" : row.valuation_band === "fair" ? "Hợp lý" : "—"}
-                        {row.valuation_score !== null ? ` ${Math.round(row.valuation_score)}` : ""}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                        row.growth_band === "high" ? "bg-sky-500/20 text-sky-300" :
-                        row.growth_band === "low" ? "bg-slate-700 text-slate-400" :
-                        "bg-slate-700 text-slate-300"
-                      }`}>
-                        {row.growth_band === "high" ? "Cao" : row.growth_band === "medium" ? "TB" : row.growth_band === "low" ? "Thấp" : "—"}
-                        {row.growth_score !== null ? ` ${Math.round(row.growth_score)}` : ""}
-                      </span>
-                    </td>
+                    <td className="number" style={{ color: "#86efac" }}>{pct(row.roe)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
-      </main>
-    </div>
-  );
-}
-
-function FilterSelect({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="rounded-full border border-white/10 bg-slate-900 px-3 py-2 text-sm text-slate-200 focus:outline-none"
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value} className="bg-slate-900">
-          {o.label}
-        </option>
-      ))}
-    </select>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 

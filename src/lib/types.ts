@@ -21,6 +21,7 @@ export interface FinancialRatios {
   price_to_sales: number | null;
   price_to_cash_flow: number | null;
   ev_to_ebitda: number | null;
+  ev_to_ebit: number | null;
   eps_vnd: number | null;
   bvps_vnd: number | null;
   market_cap_billions: number | null;
@@ -43,6 +44,8 @@ export interface FinancialRatios {
   // Leverage & Liquidity
   debt_to_equity: number | null;
   debt_to_equity_adjusted: number | null;
+  fixed_assets_to_equity: number | null;
+  equity_to_charter_capital: number | null;
   current_ratio: number | null;
   quick_ratio: number | null;
   cash_ratio: number | null;
@@ -79,6 +82,7 @@ export interface BalanceSheet {
   share_capital: number | null;
   retained_earnings: number | null;
   equity_other: number | null;
+  total_equity_and_liabilities: number | null;
 }
 
 export interface IncomeStatement {
@@ -92,12 +96,17 @@ export interface IncomeStatement {
   gross_profit: number | null;
   financial_income: number | null;
   financial_expense: number | null;
+  net_financial_income: number | null;
   operating_expenses: number | null;
   operating_profit: number | null;
+  other_income: number | null;
   profit_before_tax: number | null;
   corporate_income_tax: number | null;
+  deferred_income_tax: number | null;
   net_profit: number | null;
   net_profit_parent_company: number | null;
+  net_profit_parent_company_post: number | null;
+  minority_interest: number | null;
   eps: number | null;
   profit_growth: number | null;
   revenue_growth: number | null;
@@ -108,10 +117,18 @@ export interface CashFlow {
   year: number;
   quarter: number | null;
   period: string | null;
+  profit_before_tax: number | null;
+  depreciation_fixed_assets: number | null;
   net_cash_flow_from_operating_activities: number | null;
+  purchase_of_fixed_assets: number | null;
   net_cash_flow_from_investing_activities: number | null;
+  proceeds_from_share_issuance: number | null;
+  repayment_of_borrowings: number | null;
+  dividends_paid: number | null;
   net_cash_flow_from_financing_activities: number | null;
   net_cash_flow_period: number | null;
+  cash_beginning_of_period: number | null;
+  cash_end_of_period: number | null;
 }
 
 export interface RankingRow {
@@ -125,30 +142,49 @@ export interface RankingRow {
   roe: number | null;
   eps_vnd: number | null;
   net_profit_margin: number | null;
+  eps_cagr_5y: number | null;
+  valuation_score: number | null;
+  growth_score: number | null;
+  valuation_band: string | null;
+  growth_band: string | null;
   score: number;
 }
 
+/** Piotroski F-Score — 9 signals (null = insufficient data for that signal) */
 export interface PiotroskiResult {
   score: number;
+  rating: string;
+  vietnamese_rating: string;
+  interpretation: string;
   signals: {
-    roa_positive: boolean;
-    ocf_positive: boolean;
-    roa_improving: boolean;
-    low_accruals: boolean;
-    leverage_improving: boolean;
-    liquidity_improving: boolean;
-    no_dilution: boolean;
-    gross_margin_improving: boolean;
-    asset_turnover_improving: boolean;
+    roa_positive: boolean | null;
+    ocf_positive: boolean | null;
+    roa_improving: boolean | null;
+    cfo_gt_net_income: boolean | null;
+    leverage_improving: boolean | null;
+    current_ratio_improving: boolean | null;
+    no_dilution: boolean | null;
+    gross_margin_improving: boolean | null;
+    asset_turnover_improving: boolean | null;
   };
 }
 
+/**
+ * Health Score 0-100
+ * Components (profitability/efficiency/leverage/liquidity) are also 0-100.
+ * overall = profitability×30% + efficiency×25% + leverage×25% + liquidity×20%
+ */
 export interface HealthScore {
-  total: number;
-  profitability: number;
-  efficiency: number;
-  capital_structure: number;
-  liquidity: number;
+  overall_score: number;
+  rating: string;
+  vietnamese_rating: string;
+  interpretation: string;
+  components: {
+    profitability: { score: number; metrics: Record<string, number | null> };
+    efficiency:   { score: number; metrics: Record<string, number | null> };
+    leverage:     { score: number; metrics: Record<string, number | null> };
+    liquidity:    { score: number; metrics: Record<string, number | null> };
+  };
 }
 
 export interface CAGRResult {
@@ -156,4 +192,23 @@ export interface CAGRResult {
   revenue_cagr: number | null;
   profit_cagr: number | null;
   eps_cagr: number | null;
+}
+
+export interface CashFlowQuality {
+  score: number | null;
+  rating: string;
+  vietnamese_rating: string;
+  ocf_to_net_income: number | null;
+  fcf_to_net_income: number | null;
+  interpretation: string;
+}
+
+export interface WorkingCapitalEfficiency {
+  ccc: number | null;  // Cash Conversion Cycle (days)
+  dso: number | null;  // Days Sales Outstanding
+  dio: number | null;  // Days Inventory Outstanding
+  dpo: number | null;  // Days Payable Outstanding
+  rating: string;
+  vietnamese_rating: string;
+  interpretation: string;
 }
