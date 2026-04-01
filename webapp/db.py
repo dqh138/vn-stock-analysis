@@ -53,6 +53,8 @@ def connect(_db_path: Any = None) -> Iterator[psycopg2.extensions.connection]:
         conn = psycopg2.connect(
             _get_connection_string(),
             cursor_factory=psycopg2.extras.RealDictCursor,
+            sslmode="require",
+            connect_timeout=10,
         )
         conn.autocommit = True
         yield conn
