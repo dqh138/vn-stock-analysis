@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Báo cáo Tài chính - Phân tích Doanh nghiệp</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="/static/css/main.css?v=__ASSET_VERSION__">
+  <link rel="stylesheet" href="/static/css/valuation_analysis.css?v=__ASSET_VERSION__">
+
+  <!-- Chart.js for trend charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <a href="/" class="header-logo">
+        <div class="header-logo-icon">📊</div>
+        <span>Báo cáo Tài chính</span>
+      </a>
+
+      <div class="header-search">
+        <div class="search-input-wrapper">
+          <span class="search-icon">🔍</span>
+          <input
+            type="text"
+            class="search-input"
+            id="searchInput"
+            placeholder="Tìm kiếm công ty (VD: VCB, HPG, FPT...)"
+            autocomplete="off"
+            title="Tìm nhanh: Ctrl+K (Windows/Linux) hoặc ⌘K (Mac)"
+          >
+          <div class="search-results" id="searchResults" style="display: none;"></div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button class="btn-icon" id="rankingsNavBtn" title="Bảng xếp hạng">🏆</button>
+        <button class="btn-icon" title="Cài đặt">⚙️</button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="app-main">
+      <div class="content-area" id="mainContent">
+        <!-- Content will be loaded dynamically -->
+      </div>
+    </main>
+
+    <button
+      id="quickSearchFab"
+      class="quick-search-fab"
+      type="button"
+      aria-label="Tìm nhanh (Ctrl+K)"
+      title="Tìm nhanh: Ctrl+K (Windows/Linux) hoặc ⌘K (Mac)"
+    >🔍</button>
+  </div>
+
+  <!-- Templates -->
+  <template id="dashboardTemplate">
+    <div class="dashboard-hero">
+      <h1 class="dashboard-hero-title">Phân tích Báo cáo Tài chính</h1>
+      <p class="dashboard-hero-subtitle">
+        Khám phá sức khỏe tài chính của doanh nghiệp Việt Nam qua các báo cáo chi tiết
+      </p>
+    </div>
+
+    <div class="card" style="max-width: 600px; margin: 0 auto var(--space-8);">
+      <div class="card-header">
+        <h3 class="card-title">🔍 Tìm kiếm công ty</h3>
+      </div>
+      <p class="card-subtitle" style="margin-bottom: var(--space-4);">
+        Nhập mã cổ phiếu để bắt đầu phân tích. Ví dụ: VCB, HPG, FPT, MWG...
+      </p>
+      <div style="text-align: center; padding: var(--space-4) 0; color: var(--text-tertiary);">
+        ───────────────  HOẶC  ───────────────
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">🏭 Duyệt theo ngành (ICB)</h3>
+      </div>
+      <div class="industry-grid" id="industryGrid">
+        <!-- Industries will be loaded here -->
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: var(--space-6);">
+      <div class="card-header">
+        <h3 class="card-title">🏆 Bảng xếp hạng cổ phiếu</h3>
+      </div>
+      <p class="card-subtitle" style="margin-bottom: var(--space-4);">
+        Xếp hạng theo 2 trục: (1) định giá rẻ/đắt so với peers, (2) tiềm năng tăng trưởng (EPS CAGR + chất lượng lợi nhuận).
+      </p>
+      <button class="btn-primary" id="openRankingsBtn" type="button">Mở bảng xếp hạng</button>
+    </div>
+  </template>
+
+  <template id="rankingsTemplate">
+    <div class="dashboard-hero" style="margin-bottom: var(--space-6);">
+      <div class="rankings-hero-row">
+        <div>
+          <h1 class="dashboard-hero-title">🏆 Bảng xếp hạng cổ phiếu</h1>
+          <p class="dashboard-hero-subtitle" id="rankingsSubtitle">Đang tải dữ liệu...</p>
+        </div>
+        <div class="rankings-controls">
+          <select id="rankingsYear" class="select-input" aria-label="Năm tài chính">
+            <option value="">Năm tài chính...</option>
+          </select>
+          <select id="rankingsSort" class="select-input" aria-label="Sắp xếp">
+            <option value="overall">Tổng hợp</option>
+            <option value="valuation">Định giá (rẻ → đắt)</option>
+            <option value="growth">Tăng trưởng (cao → thấp)</option>
+          </select>
+          <select id="rankingsIndustry" class="select-input" aria-label="Ngành">
+            <option value="">Tất cả ngành</option>
+          </select>
+          <select id="rankingsExchange" class="select-input" aria-label="Sàn giao dịch">
+            <option value="">Tất cả sàn</option>
+          </select>
+          <button class="btn-primary" id="rankingsRefreshBtn" type="button">Làm mới</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Kết quả</h3>
+      </div>
+      <div class="rankings-table-wrap">
+        <table class="data-table" id="rankingsTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Mã</th>
+              <th>Doanh nghiệp</th>
+              <th>Ngành</th>
+              <th>Sàn</th>
+              <th class="number">Điểm ĐG</th>
+              <th>ĐG</th>
+              <th class="number">P/E</th>
+              <th class="number">P/B</th>
+              <th class="number">Điểm TG</th>
+              <th>TG</th>
+              <th class="number">EPS CAGR (5y)</th>
+              <th class="number">ROE</th>
+            </tr>
+          </thead>
+          <tbody id="rankingsTableBody">
+            <tr><td colspan="13" style="padding: var(--space-6); color: var(--text-secondary);">Đang tải...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card-subtitle" id="rankingsMeta" style="margin-top: var(--space-4);"></div>
+    </div>
+  </template>
+
+  <template id="companyDetailTemplate">
+    <div class="company-header">
+      <div class="company-ticker" id="companyTicker">VCB</div>
+      <div class="company-info">
+        <h1 class="company-name" id="companyName">Vietcombank</h1>
+        <div class="company-meta">
+          <span class="company-badge" id="companyIndustry">Ngân hàng</span>
+          <span class="company-badge" id="companyExchange">HOSE</span>
+        </div>
+      </div>
+      <div style="margin-left: auto;">
+        <select id="periodSelect" class="select-input" style="padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary);">
+          <option value="2024">2024</option>
+          <option value="2023">2023</option>
+          <option value="2022">2022</option>
+          <option value="2021">2021</option>
+          <option value="2020">2020</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Score Card -->
+    <div class="score-card" style="margin-bottom: var(--space-6);">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div class="score-value" id="healthScore">78<span style="font-size: var(--text-xl);">/100</span></div>
+          <div class="score-label">Điểm sức khỏe tài chính</div>
+        </div>
+        <div style="text-align: right; font-size: var(--text-2xl);" id="scoreStatus">🟢 KHỎE</div>
+      </div>
+      <div class="score-bar">
+        <div class="score-bar-fill" id="scoreBar" style="width: 78%;"></div>
+      </div>
+      <div id="scoreDetails" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); margin-top: var(--space-4); font-size: var(--text-sm);">
+        <div id="scoreProfitabilityBox">
+          <div style="color: rgba(255,255,255,0.7);">Sinh lời</div>
+          <div id="scoreProfitability">-</div>
+        </div>
+        <div id="scoreEfficiencyBox">
+          <div style="color: rgba(255,255,255,0.7);">Hiệu quả</div>
+          <div id="scoreEfficiency">-</div>
+        </div>
+        <div id="scoreStructureBox">
+          <div style="color: rgba(255,255,255,0.7);">Cơ cấu</div>
+          <div id="scoreStructure">-</div>
+        </div>
+        <div id="scoreLiquidityBox">
+          <div style="color: rgba(255,255,255,0.7);">Thanh khoản</div>
+          <div id="scoreLiquidity">-</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quality Flags Panel -->
+    <div class="quality-flags-panel" id="qualityFlagsPanel" style="margin-bottom: var(--space-6); display: none;">
+      <div class="qf-header">
+        <div class="qf-title-section">
+          <div class="qf-icon">🚦</div>
+          <div>
+            <h3 class="qf-title">Chất lượng Tổng thể</h3>
+            <div class="qf-subtitle" id="qfOverallRating">Đang phân tích...</div>
+          </div>
+        </div>
+        <div class="qf-overall-score" id="qfOverallScore">
+          <div class="qf-score-badge" id="qfScoreBadge">-</div>
+        </div>
+      </div>
+
+      <div class="qf-flags-grid" id="qfFlagsGrid">
+        <!-- Flags will be loaded here -->
+      </div>
+
+      <div class="qf-summary" id="qfSummary">
+        <!-- Summary will be loaded here -->
+      </div>
+    </div>
+
+    <!-- Cash Flow Quality Card -->
+    <div class="cash-flow-quality-card" id="cashFlowQualityCard" style="margin-bottom: var(--space-6); display: none;">
+      <div class="cfq-header">
+        <div class="cfq-title-section">
+          <div class="cfq-icon">💰</div>
+          <div>
+            <h3 class="cfq-title">Chất lượng Dòng tiền</h3>
+            <div class="cfq-subtitle" id="cfqRating">Đang tải...</div>
+          </div>
+        </div>
+        <div class="cfq-score-section">
+          <div class="cfq-score" id="cfqScore">-</div>
+          <div class="cfq-score-label">/100</div>
+        </div>
+      </div>
+
+      <div class="cfq-progress-bar">
+        <div class="cfq-progress-fill" id="cfqProgress" style="width: 0%;"></div>
+      </div>
+
+      <div class="cfq-metrics" id="cfqMetrics">
+        <!-- Metrics will be loaded here -->
+      </div>
+
+      <div class="cfq-interpretation" id="cfqInterpretation">
+        <!-- Interpretation will be loaded here -->
+      </div>
+	    </div>
+
+	    <!-- Data Provenance / Annual Selection Audit -->
+	    <div class="card data-provenance-card" id="dataProvenanceCard" style="margin-bottom: var(--space-6); display: none;">
+	      <div class="card-header">
+	        <h3 class="card-title">Nguồn & Kỳ dữ liệu (Audit)</h3>
+	      </div>
+	      <div class="card-subtitle" id="dataProvenanceSubtitle"></div>
+	      <div class="data-provenance-grid" id="dataProvenanceGrid"></div>
+	    </div>
+
+	    <!-- Percentile Ranking Card -->
+	    <div class="percentile-ranking-card" id="percentileRankingCard" style="margin-bottom: var(--space-6);">
+	      <div class="pr-header">
+	        <div class="pr-title-section">
+          <div class="pr-icon">📊</div>
+          <div>
+            <h3 class="pr-title">Xếp hạng Percentile trong Ngành</h3>
+            <div class="pr-subtitle" id="prIndustry">Đang tải...</div>
+          </div>
+        </div>
+        <div class="pr-peer-count" id="prPeerCount">
+          <!-- Peer count will be loaded here -->
+        </div>
+      </div>
+
+      <div class="pr-content" id="prContent">
+        <div style="text-align: center; padding: var(--space-8); color: var(--text-secondary);">
+          <div class="loading-spinner"></div>
+          <p style="margin-top: var(--space-4);">Đang tải dữ liệu xếp hạng...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="metrics-grid" id="keyMetrics">
+      <!-- Metrics will be loaded here -->
+    </div>
+
+    <!-- Valuation Analysis -->
+    <div class="card" style="margin-bottom: var(--space-6);">
+      <div class="card-title-row" style="margin-bottom: var(--space-4);">
+        <h3 class="card-title">💎 Phân tích Định giá Nâng cao</h3>
+        <details class="help-tip">
+          <summary aria-label="Giải thích định giá">?</summary>
+          <div class="help-tip__content">
+            <div class="help-tip__title">Giải thích: Định giá</div>
+            <div class="help-tip__body">
+              <ul>
+                <li><b>Giá hiện tại</b>: close mới nhất trong DB (giá thường lưu dạng <code>nghìn VND</code>, hệ thống quy đổi về VND khi tính).</li>
+                <li><b>P/E</b> = Price(VND) / EPS(VND), chỉ hợp lệ khi <b>EPS &gt; 0</b>.</li>
+                <li><b>P/B</b> = Price(VND) / BVPS(VND), chỉ hợp lệ khi <b>BVPS &gt; 0</b>.</li>
+                <li><b>“Giá hợp lý”</b> là heuristics (median/percentile lịch sử, Graham), dùng để tham khảo chứ không phải khuyến nghị.</li>
+                <li>Data limits: chưa điều chỉnh split/rights/bonus; có survivorship bias nếu universe thiếu mã hủy niêm yết.</li>
+              </ul>
+            </div>
+          </div>
+        </details>
+      </div>
+      <div id="valuationAnalysisSection">
+        <div style="text-align: center; padding: var(--space-8); color: var(--text-secondary);">
+          <div class="loading-spinner"></div>
+          <p style="margin-top: var(--space-4);">Đang tải phân tích định giá...</p>
+        </div>
+      </div>
+    </div>
+
+	    <div class="tabs-layout" id="companyTabs">
+      <!-- Tabs -->
+      <div class="tabs-container">
+        <div class="tabs-list">
+          <button class="tab-button active" data-tab="overview" title="Tổng quan">
+            <span class="tab-icon">🏠</span><span class="tab-label">Tổng quan</span>
+          </button>
+          <button class="tab-button" data-tab="balance" title="Cân đối KT">
+            <span class="tab-icon">🧾</span><span class="tab-label">Cân đối KT</span>
+          </button>
+          <button class="tab-button" data-tab="income" title="Kết quả KD">
+            <span class="tab-icon">📈</span><span class="tab-label">Kết quả KD</span>
+          </button>
+          <button class="tab-button" data-tab="cashflow" title="Dòng tiền">
+            <span class="tab-icon">💸</span><span class="tab-label">Dòng tiền</span>
+          </button>
+          <button class="tab-button" data-tab="ratios" title="Chỉ số TC">
+            <span class="tab-icon">📊</span><span class="tab-label">Chỉ số TC</span>
+          </button>
+          <button class="tab-button" data-tab="advanced" title="Phân Tích Nâng Cao">
+            <span class="tab-icon">🧠</span><span class="tab-label">Phân Tích Nâng Cao</span>
+          </button>
+          <button class="tab-button" data-tab="compare" title="So sánh">
+            <span class="tab-icon">⚖️</span><span class="tab-label">So sánh</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab Contents -->
+      <div class="tabs-panels">
+        <div class="tabs-toolbar" aria-label="Tùy chọn hiển thị">
+          <button id="tabsCollapseBtn" class="tabs-collapse-btn" type="button" aria-label="Thu gọn menu tab" title="Thu gọn menu">⮜</button>
+          <span class="tabs-toolbar-spacer" aria-hidden="true"></span>
+          <button id="tabsSearchBtn" class="tabs-search-btn" type="button" aria-label="Tìm công ty" title="Tìm công ty (Ctrl+K)">🔍</button>
+        </div>
+        <div id="tabOverview" class="tab-content active">
+      <div class="card">
+        <div class="card-title-row" style="margin-bottom: var(--space-4);">
+          <h3 class="card-title">📊 Xu hướng 5 năm</h3>
+          <details class="help-tip">
+            <summary aria-label="Giải thích xu hướng 5 năm">?</summary>
+            <div class="help-tip__content">
+              <div class="help-tip__title">Giải thích: Xu hướng</div>
+              <div class="help-tip__body">
+                <ul>
+                  <li>Hiển thị 5 năm gần nhất theo FY trong DB; <b>không ép missing → 0</b> và không nối qua gap.</li>
+                  <li><b>ROE, Net Margin</b> lấy từ báo cáo năm (quarter=NULL).</li>
+                  <li><b>P/E, P/B</b> được tính lại theo <b>giá cuối năm</b> để nhất quán theo thời gian; chỉ hợp lệ khi EPS/BVPS &gt; 0.</li>
+                  <li>Industry benchmark/peers (nếu có) sẽ loại dữ liệu invalid và hiển thị coverage/n ở phần meta.</li>
+                </ul>
+              </div>
+            </div>
+          </details>
+        </div>
+        <div class="overview-trend-grid">
+          <div class="overview-trend-item">
+            <h4 style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-2);">ROE (%)</h4>
+            <div class="chart-meta" id="chartROEMeta"></div>
+            <div class="chart-container">
+              <canvas id="chartROE"></canvas>
+            </div>
+          </div>
+          <div class="overview-trend-item">
+            <h4 style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-2);">Net Margin (%)</h4>
+            <div class="chart-meta" id="chartMarginMeta"></div>
+            <div class="chart-container">
+              <canvas id="chartMargin"></canvas>
+            </div>
+          </div>
+          <div class="overview-trend-item">
+            <h4 style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-2);">P/E (x)</h4>
+            <div class="chart-meta" id="chartPEMeta"></div>
+            <div class="chart-container">
+              <canvas id="chartPE"></canvas>
+            </div>
+          </div>
+          <div class="overview-trend-item">
+            <h4 style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-2);">P/B (x)</h4>
+            <div class="chart-meta" id="chartPBMeta"></div>
+            <div class="chart-container">
+              <canvas id="chartPB"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Working Capital Efficiency -->
+      <div class="card" style="margin-top: var(--space-4);">
+        <h3 class="card-title" style="margin-bottom: var(--space-4);">💰 Hiệu quả Vốn lưu động - Cash Conversion Cycle</h3>
+        <div id="workingCapitalSection">
+          <!-- Will be populated by JS -->
+        </div>
+      </div>
+
+      <!-- CAGR Analysis Section -->
+      <div class="card" style="margin-top: var(--space-4);">
+        <h3 class="card-title" style="margin-bottom: var(--space-4);">📈 Tỷ lệ tăng trưởng kép hàng năm (CAGR)</h3>
+        <div id="cagrContent" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6);">
+          <!-- CAGR Chart -->
+          <div>
+            <h4 style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-3);">Biểu đồ so sánh CAGR</h4>
+            <div style="position: relative; height: 320px;">
+              <canvas id="cagrChart"></canvas>
+            </div>
+          </div>
+
+          <!-- CAGR Table -->
+          <div>
+            <h4 style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-3);">Chi tiết các chỉ số <span id="cagrPeriodInfo" style="font-weight: normal; color: var(--text-tertiary);"></span></h4>
+            <div style="overflow-x: auto;">
+              <table class="cagr-table" id="cagrTable">
+                <thead>
+                  <tr>
+                    <th>Chỉ số</th>
+                    <th>CAGR 5 năm</th>
+                    <th>Mô tả</th>
+                    <th>Đánh giá</th>
+                  </tr>
+                </thead>
+                <tbody id="cagrTableBody">
+                  <!-- Will be populated by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top: var(--space-4); padding: var(--space-4); background: var(--bg-tertiary); border-radius: var(--radius-lg);">
+          <p style="font-size: var(--text-sm); color: var(--text-secondary); margin: 0;">
+            <strong>CAGR (Compound Annual Growth Rate)</strong> - Tỷ lệ tăng trưởng kép hàng năm đo lường tốc độ tăng trưởng trung bình của một chỉ số trong một kỳ nhất định.<br>
+            <span style="color: var(--color-success-500);">● Xanh: Tăng trưởng tốt (>10%)</span> |
+            <span style="color: var(--color-warning-500);">● Vàng: Tăng trưởng trung bình (0-10%)</span> |
+            <span style="color: var(--color-danger-500);">● Đỏ: Suy giảm (<0%)</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- DuPont Analysis -->
+      <div class="card" style="margin-top: var(--space-4);">
+        <h3 class="card-title" style="margin-bottom: var(--space-4);">🔬 Extended DuPont Analysis - Phân tích ROE Mở Rộng</h3>
+        <div id="dupontAnalysis" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-4); text-align: center;">
+          <!-- Will be populated by JS -->
+        </div>
+        <div id="dupontWaterfallChart">
+          <!-- Waterfall chart will be rendered here -->
+        </div>
+        <div style="margin-top: var(--space-4); padding: var(--space-4); background: var(--bg-tertiary); border-radius: var(--radius-lg);">
+          <p style="font-size: var(--text-sm); color: var(--text-secondary); margin: 0;">
+            <strong>ROE = Tax Burden × Interest Burden × Operating Margin × Asset Turnover × Financial Leverage</strong><br>
+            Phân tích ROE mở rộng thành 5 thành phần giúp xác định chính xác nguồn gốc sinh lời từ hoạt động kinh doanh, chi phí lãi vay, thuế, hiệu quả tài sản và đòn bẩy tài chính.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div id="tabBalance" class="tab-content">
+      <div class="card">
+        <h3 class="card-title" style="margin-bottom: var(--space-4);">📋 Bảng Cân đối Kế toán</h3>
+        <div style="overflow-x: auto;">
+          <table class="data-table" id="balanceSheetTable">
+            <!-- Table will be loaded here -->
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="tabIncome" class="tab-content">
+      <div class="card">
+        <h3 class="card-title" style="margin-bottom: var(--space-4);">📋 Báo cáo Kết quả Kinh doanh</h3>
+        <div style="overflow-x: auto;">
+          <table class="data-table" id="incomeStatementTable">
+            <!-- Table will be loaded here -->
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="tabCashflow" class="tab-content">
+      <div class="card">
+        <h3 class="card-title" style="margin-bottom: var(--space-4);">📋 Báo cáo Lưu chuyển Tiền tệ</h3>
+        <div style="overflow-x: auto;">
+          <table class="data-table" id="cashflowTable">
+            <!-- Table will be loaded here -->
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="tabRatios" class="tab-content">
+      <div class="card">
+        <h3 class="card-title" style="margin-bottom: var(--space-4);">📋 Các Chỉ số Tài chính</h3>
+        <div style="overflow-x: auto;">
+          <table class="data-table" id="ratiosTable">
+            <!-- Table will be loaded here -->
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="tabCompare" class="tab-content">
+      <div class="card">
+        <h3 class="card-title" style="margin-bottom: var(--space-4);">⚖️ So sánh trong ngành</h3>
+        <div id="compareContent">
+          <!-- Add company input -->
+          <div style="margin-bottom: var(--space-4);">
+            <input type="text" id="compareAddInput" class="search-input" placeholder="Thêm công ty so sánh (VD: HSG, NKG...)" style="width: 300px;">
+            <button id="compareAddBtn" class="btn-primary" style="margin-left: var(--space-2); padding: var(--space-2) var(--space-4); background: var(--color-primary-600); color: white; border: none; border-radius: var(--radius-md); cursor: pointer;">Thêm</button>
+          </div>
+          <!-- Selected companies -->
+          <div id="compareSelected" style="display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-4);"></div>
+          <!-- Comparison charts (auto-filter by overlap coverage) -->
+          <div id="compareCharts" style="display: none; margin-bottom: var(--space-4);">
+            <div class="research-viz-controls" style="margin-bottom: var(--space-3);">
+              <select id="compareASymbolSelect" class="select-input" title="Chọn mã A"></select>
+              <select id="compareBSymbolSelect" class="select-input" title="Chọn mã B"></select>
+              <select id="compareYearsSelect" class="select-input" title="Số năm hiển thị">
+                <option value="5">5 năm</option>
+                <option value="10" selected>10 năm</option>
+              </select>
+              <button id="compareChartsRefreshBtn" class="btn-primary" type="button">Cập nhật biểu đồ</button>
+              <div class="research-viz-meta-inline" id="compareChartsMeta"></div>
+            </div>
+            <div class="research-viz-grid" id="compareChartsGrid"></div>
+            <div class="research-viz-meta" style="margin-top: var(--space-2);">
+              Chỉ hiển thị các tiêu chí có dữ liệu chồng lấn giữa 2 mã (không ép missing → 0).
+            </div>
+          </div>
+          <!-- Comparison table -->
+          <div id="compareTable" style="overflow-x: auto;"></div>
+        </div>
+      </div>
+    </div>
+
+	    <div id="tabAdvanced" class="tab-content">
+	      <!-- Quarterly / TTM Fundamentals Section -->
+	      <div id="ttmFundamentalsSection" style="margin-bottom: var(--space-4);">
+	        <!-- Will be populated by JS -->
+	      </div>
+
+	      <!-- Price-based Risk Analysis Section -->
+	      <div id="riskAnalysisSection" style="margin-bottom: var(--space-4);">
+	        <!-- Will be populated by JS -->
+	      </div>
+
+      <!-- Valuation Research (P2) -->
+      <div class="card" style="margin-bottom: var(--space-4);">
+        <div class="card-title-row" style="margin-bottom: var(--space-2);">
+          <h3 class="card-title">💎 Valuation Research</h3>
+          <details class="help-tip">
+            <summary aria-label="Giải thích Valuation Research">?</summary>
+            <div class="help-tip__content">
+              <div class="help-tip__title">Giải thích: Valuation Research</div>
+              <div class="help-tip__body">
+                <ul>
+                  <li><b>P/E, P/B</b> được tính lại theo năm: <code>close_cuoi_nam × 1000 / (EPS, BVPS)</code> để tránh sai nghĩa “as-of”.</li>
+                  <li><b>Band</b> là P25–P75 lịch sử (company), không phải dự báo.</li>
+                  <li><b>Overlay</b> so sánh giá cuối năm với “giá hợp lý” theo heuristics (P50, Graham).</li>
+                  <li><b>Decomposition</b> dùng log-return: EPS growth + PE re-rating + cash dividends. Không điều chỉnh split/rights/bonus (data limits).</li>
+                  <li><b>Peers histogram</b> loại dữ liệu invalid (ví dụ EPS/BVPS ≤ 0) và thường trim theo P5–P95 để tránh outlier “nuốt” chart.</li>
+                </ul>
+              </div>
+            </div>
+          </details>
+        </div>
+        <div class="card-subtitle" style="margin-bottom: var(--space-4);">
+          P/E, P/B được tính lại từ <b>giá cuối năm</b> × 1000 / (EPS, BVPS) để nhất quán theo thời gian. Không điều chỉnh split/rights/bonus (data limits).
+        </div>
+
+	        <div class="research-viz-controls" style="margin-bottom: var(--space-3);">
+	          <select id="valuationYearsSelect" class="select-input">
+	            <option value="5">5 năm</option>
+	            <option value="10" selected>10 năm</option>
+	          </select>
+	          <select id="valuationHorizonSelect" class="select-input">
+	            <option value="3">Decompose 3Y</option>
+	            <option value="5" selected>Decompose 5Y</option>
+	            <option value="7">Decompose 7Y</option>
+	          </select>
+	          <button id="valuationResearchRefreshBtn" class="btn-primary" type="button">Cập nhật</button>
+	          <div class="research-viz-meta-inline" id="valuationResearchMeta"></div>
+	        </div>
+
+	        <div class="research-viz-grid">
+	          <div class="research-viz-item">
+	            <div class="research-viz-header">
+	              <div class="research-viz-title">Band: P/E (Company, P25–P75 lịch sử)</div>
+	              <div class="research-viz-meta-inline" id="peBandMeta"></div>
+	            </div>
+	            <div class="chart-wrapper">
+	              <canvas id="peBandChart"></canvas>
+	            </div>
+	          </div>
+
+	          <div class="research-viz-item">
+	            <div class="research-viz-header">
+	              <div class="research-viz-title">Band: P/B (Company, P25–P75 lịch sử)</div>
+	              <div class="research-viz-meta-inline" id="pbBandMeta"></div>
+	            </div>
+	            <div class="chart-wrapper">
+	              <canvas id="pbBandChart"></canvas>
+	            </div>
+	          </div>
+
+	          <div class="research-viz-item research-viz-item-wide">
+	            <div class="research-viz-header">
+	              <div class="research-viz-title">Overlay: Giá cuối năm vs “Giá hợp lý” (heuristics)</div>
+	              <div class="research-viz-meta-inline" id="fairOverlayMeta"></div>
+	            </div>
+	            <div class="chart-wrapper">
+	              <canvas id="fairOverlayChart"></canvas>
+	            </div>
+	          </div>
+
+	          <div class="research-viz-item">
+	            <div class="research-viz-header">
+	              <div class="research-viz-title">Decomposition: EPS growth + PE re-rating + Dividends (log)</div>
+	              <div class="research-viz-meta-inline" id="returnDecompMeta"></div>
+	            </div>
+	            <div class="chart-wrapper">
+	              <canvas id="returnDecompositionChart"></canvas>
+	            </div>
+	          </div>
+
+	          <div class="research-viz-item">
+	            <div class="research-viz-header">
+	              <div class="research-viz-title">Peers: Distribution (Histogram)</div>
+	              <div class="research-viz-controls">
+	                <select id="peerDistMetricSelect" class="select-input">
+	                  <option value="price_to_earnings" selected>P/E</option>
+	                  <option value="price_to_book">P/B</option>
+	                  <option value="ev_to_ebitda">EV/EBITDA</option>
+	                  <option value="roe">ROE</option>
+	                </select>
+	                <button id="peerDistRefreshBtn" class="btn-primary" type="button">Cập nhật</button>
+	              </div>
+	            </div>
+	            <div class="chart-wrapper">
+	              <canvas id="peerDistributionChart"></canvas>
+	            </div>
+	            <div class="research-viz-meta" id="peerDistMeta"></div>
+	          </div>
+	        </div>
+	      </div>
+
+      <!-- Research-grade Visualizations (P2) -->
+      <div class="card" style="margin-bottom: var(--space-4);">
+        <div class="card-title-row" style="margin-bottom: var(--space-2);">
+          <h3 class="card-title">🔬 Research Visualizations</h3>
+          <details class="help-tip">
+            <summary aria-label="Giải thích Research Visualizations">?</summary>
+            <div class="help-tip__content">
+              <div class="help-tip__title">Giải thích: Research Viz</div>
+              <div class="help-tip__body">
+                <ul>
+                  <li><b>Scatter</b>: nhìn mối quan hệ giữa 2 metric trong ngành/peers (không hàm ý nhân quả).</li>
+                  <li><b>Radar</b>: percentile rank của company so với peers (50 = median). Metric “inverted” sẽ được chú thích.</li>
+                  <li><b>Heatmap</b>: correlation theo lịch sử của company; correlation ≠ causation.</li>
+                  <li>Mọi chart đều ưu tiên tính trung thực dưới data limits: loại invalid, hiển thị coverage/n, tránh missing → 0.</li>
+                </ul>
+              </div>
+            </div>
+          </details>
+        </div>
+        <div class="card-subtitle" style="margin-bottom: var(--space-4);">
+          Scatter/Heatmap/Radar đều hiển thị theo <b>giới hạn dữ liệu</b> (coverage, n) và tránh ép missing → 0.
+        </div>
+
+	        <div class="research-viz-grid">
+	          <!-- Peer scatter -->
+	          <div class="research-viz-item">
+	            <div class="research-viz-header">
+	              <div class="research-viz-title">Scatter (Peers): Valuation vs Quality</div>
+	              <div class="research-viz-controls">
+	                <select id="scatterXSelect" class="select-input">
+	                  <option value="price_to_earnings" selected>P/E</option>
+	                  <option value="price_to_book">P/B</option>
+	                  <option value="ev_to_ebitda">EV/EBITDA</option>
+	                </select>
+	                <select id="scatterYSelect" class="select-input">
+	                  <option value="roe" selected>ROE</option>
+	                  <option value="roa">ROA</option>
+	                  <option value="net_profit_margin">Net Margin</option>
+	                </select>
+	                <button id="scatterRefreshBtn" class="btn-primary" type="button">Cập nhật</button>
+	              </div>
+	            </div>
+	            <div class="chart-wrapper">
+	              <canvas id="peerScatterChart"></canvas>
+	            </div>
+	            <div class="research-viz-meta" id="peerScatterMeta"></div>
+	          </div>
+
+	          <!-- Radar -->
+	          <div class="research-viz-item">
+	            <div class="research-viz-header">
+	              <div class="research-viz-title">Radar: Company vs Industry Percentiles</div>
+	              <div class="research-viz-meta-inline" id="peerRadarMeta"></div>
+	            </div>
+	            <div class="chart-wrapper">
+	              <canvas id="peerRadarChart"></canvas>
+	            </div>
+	          </div>
+
+	          <!-- Correlation heatmap -->
+	          <div class="research-viz-item research-viz-item-wide">
+	            <div class="research-viz-header">
+	              <div class="research-viz-title">Heatmap: Metric Correlation (Company, 5–10Y)</div>
+	              <div class="research-viz-meta-inline" id="corrHeatmapMeta"></div>
+	            </div>
+	            <div id="metricCorrelationHeatmap" class="corr-heatmap">
+	              <div style="text-align: center; padding: var(--space-6); color: var(--text-secondary);">
+	                <div class="loading-spinner"></div>
+	                <p style="margin-top: var(--space-3);">Đang tính correlation...</p>
+	              </div>
+	            </div>
+	          </div>
+	        </div>
+	      </div>
+
+      <!-- Piotroski F-Score Section -->
+      <div class="card" style="margin-bottom: var(--space-4);">
+        <div class="card-title-row" style="margin-bottom: var(--space-4);">
+          <h3 class="card-title">📊 Piotroski F-Score</h3>
+          <details class="help-tip">
+            <summary aria-label="Giải thích Piotroski F-Score">?</summary>
+            <div class="help-tip__content">
+              <div class="help-tip__title">Giải thích: Piotroski F-Score</div>
+              <div class="help-tip__body">
+                <ul>
+                  <li>Thang 0–9, chấm theo 3 nhóm: <b>Profitability</b>, <b>Leverage/Liquidity</b>, <b>Operating efficiency</b>.</li>
+                  <li>Hữu ích để lọc doanh nghiệp “khỏe lên” về chất lượng tài chính, nhưng cần đọc cùng ngữ cảnh ngành và data limits.</li>
+                </ul>
+              </div>
+            </div>
+          </details>
+        </div>
+        <div id="piotroskiSection">
+          <div style="text-align: center; padding: var(--space-8); color: var(--text-secondary);">
+            <div class="loading-spinner"></div>
+            <p style="margin-top: var(--space-4);">Đang tải dữ liệu phân tích...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Altman Z-Score Section -->
+      <div id="altmanZScoreSection" style="margin-bottom: var(--space-4);">
+        <!-- Will be populated by JS -->
+      </div>
+
+      <!-- Early Warning System Section -->
+      <div id="earlyWarningSection" style="margin-bottom: var(--space-4);">
+        <!-- Will be populated by JS -->
+      </div>
+
+      <!-- Dividend Analysis Section -->
+      <div class="card" style="margin-bottom: var(--space-4);">
+        <div class="card-title-row" style="margin-bottom: var(--space-4);">
+          <h3 class="card-title">💰 Phân tích Cổ tức</h3>
+          <details class="help-tip">
+            <summary aria-label="Giải thích cổ tức">?</summary>
+            <div class="help-tip__content">
+              <div class="help-tip__title">Giải thích: Cổ tức</div>
+              <div class="help-tip__body">
+                <ul>
+                  <li>Nguồn cổ tức tiền mặt lấy từ <code>events</code> với <code>event_list_code='DIV'</code>. Nếu thiếu coverage sự kiện, phần yield/CAGR sẽ <b>N/A</b>.</li>
+                  <li><b>Dividend Yield</b> dùng tổng cổ tức năm gần nhất / giá close mới nhất (giá được quy đổi về VND nếu DB lưu <code>nghìn VND</code>).</li>
+                  <li><b>CAGR</b> cần tối thiểu 2 năm có cổ tức &gt; 0; nếu không đủ mẫu sẽ N/A.</li>
+                  <li>Data limits: không điều chỉnh split/rights/bonus; payout ratio có thể đến từ bảng ratios dù thiếu lịch sử DIV.</li>
+                </ul>
+              </div>
+            </div>
+          </details>
+        </div>
+        <div id="dividendAnalysisSection">
+          <div style="text-align: center; padding: var(--space-8); color: var(--text-secondary);">
+            <div class="loading-spinner"></div>
+            <p style="margin-top: var(--space-4);">Đang tải dữ liệu cổ tức...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- Metric Chart Modal -->
+  <div id="metricChartModal" class="modal" style="display: none;">
+    <div class="modal-overlay" onclick="closeMetricChart()"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="metricChartTitle" class="modal-title">Biểu đồ chỉ tiêu</h3>
+        <button class="modal-close" onclick="closeMetricChart()">&times;</button>
+      </div>
+      <div class="modal-controls">
+        <div class="control-group">
+          <label>Kỳ:</label>
+          <select id="chartPeriodSelect" onchange="updateMetricChart()">
+            <option value="year">Năm</option>
+            <option value="quarter">Quý</option>
+          </select>
+        </div>
+        <div class="control-group" id="quarterCountGroup" style="display: none;">
+          <label>Số kỳ:</label>
+          <select id="chartCountSelect" onchange="updateMetricChart()">
+            <option value="4">4 quý</option>
+            <option value="8">8 quý</option>
+            <option value="12" selected>12 quý</option>
+            <option value="16">16 quý</option>
+            <option value="20">20 quý</option>
+          </select>
+        </div>
+        <div class="control-group" id="yearCountGroup">
+          <label>Số năm:</label>
+          <select id="yearCountSelect" onchange="updateMetricChart()">
+            <option value="3">3 năm</option>
+            <option value="5" selected>5 năm</option>
+            <option value="7">7 năm</option>
+            <option value="10">10 năm</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="chart-wrapper">
+          <canvas id="metricDetailChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/static/js/app.js?v=__ASSET_VERSION__"></script>
+</body>
+</html>

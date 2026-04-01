@@ -1,0 +1,15 @@
+node_modules/
+.next/
+src/
+next.config.ts
+next-env.d.ts
+postcss.config.js
+tsconfig.json
+package.json
+package-lock.json
+scripts/
+supabase/
+webapp/analysis/test_*.py
+webapp/analysis/backtest_*.py
+webapp/analysis/return_engine.py
+webapp/analysis/demo_*.py
