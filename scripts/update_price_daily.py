@@ -61,7 +61,7 @@ def get_all_symbols(conn) -> list:
 def fetch_price(symbol: str, start: str, end: str) -> list:
     """Fetch OHLCV từ vnstock, trả về list of dicts."""
     try:
-        q = Quote(symbol)
+        q = Quote(source='vci', symbol=symbol)
         df = q.history(start=start, end=end, interval="1D")
         if df is None or df.empty:
             return []
