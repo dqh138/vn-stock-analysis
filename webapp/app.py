@@ -639,7 +639,7 @@ def api_financial_history(
             # Get the latest available year in the database
             cursor.execute("SELECT MAX(year) FROM financial_ratios WHERE quarter IS NULL")
             result = cursor.fetchone()
-            max_db_year = result[0] if result and result[0] else datetime.now().year
+            max_db_year = result["max"] if result and result["max"] else datetime.now().year
             current_year = min(datetime.now().year, max_db_year)
             year_from = current_year - years + 1
 
@@ -740,7 +740,7 @@ def api_financial_history_benchmark(
             # Determine year range - use DB max year instead of current year
             cursor.execute("SELECT MAX(year) FROM financial_ratios WHERE quarter IS NULL")
             result = cursor.fetchone()
-            max_db_year = result[0] if result and result[0] else datetime.now().year
+            max_db_year = result["max"] if result and result["max"] else datetime.now().year
             current_year = min(datetime.now().year, max_db_year)
             year_from = current_year - years + 1
 
@@ -2159,9 +2159,9 @@ def api_reconcile_metrics(
                 """, (symbol,))
                 row = cursor.fetchone()
 
-        if not row or row[0] is None:
+        if not row or row["year"] is None:
             raise HTTPException(status_code=404, detail=f"No data found for {symbol}")
-        year = row[0]
+        year = row["year"]
 
     # Parse metrics list
     metric_list = None
@@ -2209,9 +2209,9 @@ def api_reconcile_single_metric(
                 """, (symbol,))
                 row = cursor.fetchone()
 
-        if not row or row[0] is None:
+        if not row or row["year"] is None:
             raise HTTPException(status_code=404, detail=f"No data found for {symbol}")
-        year = row[0]
+        year = row["year"]
 
     try:
         result = reconcile_metric(symbol, year, metric)
